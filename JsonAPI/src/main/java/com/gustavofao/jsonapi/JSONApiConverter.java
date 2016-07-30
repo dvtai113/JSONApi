@@ -2,6 +2,7 @@ package com.gustavofao.jsonapi;
 
 import android.util.Log;
 
+import com.google.gson.Gson;
 import com.gustavofao.jsonapi.Annotations.Excluded;
 import com.gustavofao.jsonapi.Annotations.Id;
 import com.gustavofao.jsonapi.Annotations.SerialName;
@@ -18,7 +19,6 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -42,7 +42,9 @@ public class JSONApiConverter {
 
     private HashMap<String, Class<? extends Resource>> classesIndex;
 
-    public JSONApiConverter(Class<? extends Resource>... classes) {
+    private final Gson gson;
+
+    public JSONApiConverter(Gson gson, Class<? extends Resource>... classes) {
         dateFormatFromServer = new SimpleDateFormat(DATE_FORMAT_FROM_SERVER, Locale.US);
         dateFormatToServer = new SimpleDateFormat(DATE_FORMAT_TO_SERVER, Locale.US);
 
@@ -64,13 +66,22 @@ public class JSONApiConverter {
                 Log.e("Classes", "No Annotation [" + c.getName() + "]");
             }
         }
+        this.gson = (gson != null) ? gson : new Gson();
+    }
+
+    public JSONApiConverter(Gson gson, HashMap<String, Class<? extends Resource>> classesIndex) {
+        dateFormatFromServer = new SimpleDateFormat(DATE_FORMAT_FROM_SERVER, Locale.US);
+        dateFormatToServer = new SimpleDateFormat(DATE_FORMAT_TO_SERVER, Locale.US);
+        this.classesIndex = classesIndex;
+        this.gson = (gson != null) ? gson : new Gson();
+    }
+
+    public JSONApiConverter(Class<? extends Resource>... classes) {
+        this(null, classes);
     }
 
     public JSONApiConverter(HashMap<String, Class<? extends Resource>> classesIndex) {
-        dateFormatFromServer = new SimpleDateFormat(DATE_FORMAT_FROM_SERVER, Locale.US);
-        dateFormatToServer = new SimpleDateFormat(DATE_FORMAT_TO_SERVER, Locale.US);
-
-        this.classesIndex = classesIndex;
+        this(null, classesIndex);
     }
 
     public JSONApiConverter withDateFormat(SimpleDateFormat dateFormat) {
@@ -306,13 +317,13 @@ public class JSONApiConverter {
         //Inicia os relationships
         if (!jsonObject.isNull("relationships")) {
             JSONObject relationships = jsonObject.getJSONObject("relationships");
-            Iterator <String> keys = relationships.keys();
+            Iterator<String> keys = relationships.keys();
             while (keys.hasNext()) {
                 String key = keys.next();
                 JSONObject eachRelation = relationships.getJSONObject(key);
 
                 Object data = eachRelation.get("data");
-                if (fieldsHash.containsKey(key)){
+                if (fieldsHash.containsKey(key)) {
                     Field field = fieldsHash.get(key);
                     Boolean oldAccessible = field.isAccessible();
                     field.setAccessible(true);
@@ -450,7 +461,7 @@ public class JSONApiConverter {
             mainNode.put("data", mainContent);
             if (include.length() > 0)
                 mainNode.put("included", include);
-        } catch (Exception ex){
+        } catch (Exception ex) {
             ex.printStackTrace();
         }
         return mainNode;
@@ -462,7 +473,8 @@ public class JSONApiConverter {
             if (resource.equals(ninstance)) {
                 return new JSONObject();
             }
-        } catch (Exception e) {}
+        } catch (Exception e) {
+        }
 
         List<Field> fields = getFields(resource.getClass());
         JSONObject mainNode = new JSONObject();
@@ -693,7 +705,7 @@ public class JSONApiConverter {
                 attributes.put(fieldName, field.getBoolean(resource));
             } else if (field.get(resource) instanceof Date) {
                 attributes.put(fieldName, dateFormatToServer.format((Date) field.get(resource)).replace(" ", "T"));
-            }else if (field.get(resource) instanceof Resource) {
+            } else if (field.get(resource) instanceof Resource) {
                 JSONObject relationshipNode = new JSONObject();
                 relationshipNode.put("data", getNodeAsRelationship(field.get(resource)));
 
